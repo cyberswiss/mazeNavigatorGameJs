@@ -1,24 +1,23 @@
-const {
-  Engine,
-  Render,
-  Runner,
-  World,
-  Bodies,
-  
-} = Matter;
+const { Engine, Render, Runner, World, Bodies, Body, Events } = Matter;
+
+const cellsHorizontal = 5;
+const cellsVertical = 4;
 //width and height of the canvas
- const width= 600;
- const height = 600;
- //cells--number of cells per row and column as the canvas is square
- const cells = 3;
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+//diemnsions of each cell
+const unitLengthX = width / cellsHorizontal;
+const unitLengthY = height / cellsVertical;
 
 const engine = Engine.create();
+engine.world.gravity.y = 0;
 const { world } = engine;
 const render = Render.create({
   element: document.body,
   engine: engine,
   options: {
-   wireframes:true,
+    wireframes: false,
     width,
     height
   }
@@ -26,109 +25,218 @@ const render = Render.create({
 Render.run(render);
 Runner.run(Runner.create(), engine);
 
-// Boundar Walls
+// Walls
 const walls = [
-  Bodies.rectangle(width/2, 0, width, 40, { isStatic: true }),
-  Bodies.rectangle(width/2, height, width, 40, { isStatic: true }),
-  Bodies.rectangle(0, height/2, 40, height, { isStatic: true }),
-  Bodies.rectangle(width, height/2, 40, height, { isStatic: true })
+  Bodies.rectangle(width / 2, 0, width, 2, { isStatic: true }),
+  Bodies.rectangle(width / 2, height, width, 2, { isStatic: true }),
+  Bodies.rectangle(0, height / 2, 2, height, { isStatic: true }),
+  Bodies.rectangle(width, height / 2, 2, height, { isStatic: true })
 ];
 World.add(world, walls);
 
-//the grids array 2-d areay......every value will be false as the purpose of the grid array is to
-//keep track if we have visited the particular cell or not
-//maze generation
-//const grid = [];
-
-//for (let i=0;i<3;i++){
-  //grid.push([])
-  //for(let j=0;j<3;j++){
-   // grid[i].push(false);
-  //}
-//}
-//console.log(grid);
-
-//more efficent way of creating the nested arrays
-const grid = Array(3).fill(null).map(()=>Array(3).fill(false));
-//console.log(grid);
-
-//generation if verticals and horizontals array
-//verticals- keep track of all the vertical walls -false if it closed,lly horixontal array
-//the diemensions are different from the grid array ....
-
-const verticals = Array(cells)
-.fill(null)
-.map(()=> Array(cells-1).fill(false));
-
-
-const horizontals = Array(cells-1)
-.fill(null)
-.map(()=> Array(cells).fill(false));
-console.log(horizontals);
-
-//algorithm
-//picking a random cell
-
-const startRow = Math.floor(Math.random()*cells);
-const startColumn = Math.floor(Math.random()*cells);
-//logs the index of the cell
-//console.log(startRow,startColumn);
-
-//shuffle --randomaises the conetent of an array
-const shuffle = (arr)=>{
+// Maze generation
+//shuffle funcion takes an array and shuffeles its elements
+const shuffle = arr => {
   let counter = arr.length;
-   while(counter > 0){
-     const index = Math.floor(Math.random()*counter);
-     counter--;
-     const temp = arr[counter];
-     arr[counter] = arr[index];
-     arr[index] = temp;
-   }
-   return arr;
-}
 
-const stepThroughCell = () =>{
-  //if i have visited the cell at [row,column],then return
-  if(grid[row][column]){
+  while (counter > 0) {
+    const index = Math.floor(Math.random() * counter);
+
+    counter--;
+
+    const temp = arr[counter];
+    arr[counter] = arr[index];
+    arr[index] = temp;
+  }
+
+  return arr;
+};
+//creating the grid array
+const grid = Array(cellsVertical)
+  .fill(null)
+  .map(() => Array(cellsHorizontal).fill(false));
+//creating the vertical walls array
+const verticals = Array(cellsVertical)
+  .fill(null)
+  .map(() => Array(cellsHorizontal - 1).fill(false));
+//creating the horixontal walls array
+const horizontals = Array(cellsVertical - 1)
+  .fill(null)
+  .map(() => Array(cellsHorizontal).fill(false));
+  //selection of a random cell for the starting the maze creation
+
+const startRow = Math.floor(Math.random() * cellsVertical);
+const startColumn = Math.floor(Math.random() * cellsHorizontal);
+
+const stepThroughCell = (row, column) => {
+  // If i have visted the cell at [row, column], then return
+  if (grid[row][column]) {
     return;
   }
 
-  //mark this cell as being visited---that is go the grid array mark it as true
-grid[row][column]= true;
+  // Mark this cell as being visited
+  grid[row][column] = true;
 
-  //assemble randomly ordered list of arrays
-  const neighbours =shuffle([
-    [row-1,column,,'up'],//above right down ,left etc cell neighbour
-    [row,column+1,'right'],
-    [row+1,column, 'down'],
-    [row,column-1,'left']
-  ]) 
- 
-  //for each neighbour
-for (let neighbour of neighbours){
-  const [nextRow,nextColumn,direction] = neighbour;
- //see if neighbour is outofbound--that is no place to go on a side
-  if(nextRow<0 || nextRow>=cells ||nextColumn < 0 || nextColumn >= cells){
-        continue;//skip this neighbour and continue with the next lines of code continue is a keyword search mdn
+  // Assemble randomly-ordered list of neighbors
+  const neighbors = shuffle([
+    [row - 1, column, 'up'],
+    [row, column + 1, 'right'],
+    [row + 1, column, 'down'],
+    [row, column - 1, 'left']
+  ]);
+  // For each neighbor....
+  for (let neighbor of neighbors) {
+    const [nextRow, nextColumn, direction] = neighbor;
+
+    // See if that neighbor is out of bounds
+    if (
+      nextRow < 0 ||
+      nextRow >= cellsVertical ||
+      nextColumn < 0 ||
+      nextColumn >= cellsHorizontal
+    ) {
+      continue;
+    }
+
+    // If we have visited that neighbor, continue to next neighbor
+    if (grid[nextRow][nextColumn]) {
+      continue;
+    }
+
+    // Remove a wall from either horizontals or verticals
+    if (direction === 'left') {
+      verticals[row][column - 1] = true;
+    } else if (direction === 'right') {
+      verticals[row][column] = true;
+    } else if (direction === 'up') {
+      horizontals[row - 1][column] = true;
+    } else if (direction === 'down') {
+      horizontals[row][column] = true;
+    }
+
+    stepThroughCell(nextRow, nextColumn);
   }
-  //if we have visited the neighbour,continue  to next neighbour
-if(grid[nextRow,nextColumn]){
-  continue;
-}
-//Remove a wall from the horozontal or vertical array
-if(direction==='left'){
-  verticals[row][column-1]=true;
-} else if (direction === 'right'){
-  verticals[row][column]= true;
-}else if (direction === 'up'){
-  horizontals[row-1][column]= true;
-}else if (direction === 'down'){
-  horizontals[row][column]= true;
-}
-
-}
-  //visit the next cell
-
 };
 
-stepThroughCell(startCell,startColumn)
+stepThroughCell(startRow, startColumn);
+//drawing the horizontal walls
+horizontals.forEach((row, rowIndex) => {
+  row.forEach((open, columnIndex) => {
+    if (open) {
+      return;
+    }
+
+    const wall = Bodies.rectangle(
+      columnIndex * unitLengthX + unitLengthX / 2,
+      rowIndex * unitLengthY + unitLengthY,
+      unitLengthX,
+      5,
+      {
+        label: 'wall',
+        isStatic: true,
+        render: {
+          fillStyle: 'red'
+        }
+      }
+    );
+    World.add(world, wall);
+  });
+});
+//drawing the vertical walls
+verticals.forEach((row, rowIndex) => {
+  row.forEach((open, columnIndex) => {
+    if (open) {
+      return;
+    }
+
+    const wall = Bodies.rectangle(
+      columnIndex * unitLengthX + unitLengthX,
+      rowIndex * unitLengthY + unitLengthY / 2,
+      5,
+      unitLengthY,
+      {
+        label: 'wall',
+        isStatic: true,
+        render: {
+          fillStyle: 'red'
+        }
+      }
+    );
+    World.add(world, wall);
+  });
+});
+
+// Goal
+
+const goal = Bodies.rectangle(
+  width - unitLengthX / 2,
+  height - unitLengthY / 2,
+  unitLengthX * 0.7,
+  unitLengthY * 0.7,
+  {
+    label: 'goal',
+    isStatic: true,
+    render: {
+      fillStyle: 'green'
+    }
+  }
+);
+World.add(world, goal);
+
+// Ball
+
+const ballRadius = Math.min(unitLengthX, unitLengthY) / 4;
+const ball = Bodies.circle(unitLengthX / 2, unitLengthY / 2, ballRadius, {
+  label: 'ball',
+  render: {
+    fillStyle: 'blue'
+  }
+});
+World.add(world, ball);
+
+document.addEventListener('keydown', event => {
+  const { x, y } = ball.velocity;
+
+  if (event.keyCode === 87) {
+    Body.setVelocity(ball, { x, y: y - 2 });
+  }
+
+  if (event.keyCode === 68) {
+    Body.setVelocity(ball, { x: x + 2, y });
+  }
+
+  if (event.keyCode === 83) {
+    Body.setVelocity(ball, { x, y: y + 2 });
+  }
+
+  if (event.keyCode === 65) {
+    Body.setVelocity(ball, { x: x - 2, y });
+  }
+});
+
+// Win Condition
+//determining succesess or win condition
+//by registering colliosion between ball and the goal
+
+
+
+Events.on(engine, 'collisionStart', event => {
+  event.pairs.forEach(collision => {
+    const labels = ['ball', 'goal'];
+//checking if the bodies collision
+    //search the includes methods of an array to understand the line below
+    if (
+      labels.includes(collision.bodyA.label) &&
+      labels.includes(collision.bodyB.label)
+    ) {
+       document.querySelector('.win').classList.remove('hide');
+      world.gravity.y = 1;
+      world.bodies.forEach(body => {
+        if (body.label === 'wall') {
+          Body.setStatic(body, false);
+        }
+      });
+    }
+  });
+ 
+});
